@@ -1,0 +1,81 @@
+The contents of the file /BidWise/BidWise/backend/tests will include a basic structure for unit and feature tests for the application. Here is the content:
+
+<?php
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class UserRegistrationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_user_can_register()
+    {
+        $response = $this->post('/api/register', [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('users', [
+            'email' => 'test@example.com',
+        ]);
+    }
+}
+
+class AuctionManagementTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_seller_can_create_auction()
+    {
+        $this->actingAs(factory(App\Models\User::class)->create(['role' => 'seller']));
+
+        $response = $this->post('/api/auctions', [
+            'title' => 'Test Auction',
+            'description' => 'This is a test auction.',
+            'starting_price' => 100,
+            'end_time' => now()->addDays(1),
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('auctions', [
+            'title' => 'Test Auction',
+        ]);
+    }
+}
+
+class RealTimeBiddingTest extends TestCase
+{
+    public function test_user_can_place_bid()
+    {
+        // This test would require WebSocket testing setup
+        // Placeholder for real-time bidding tests
+    }
+}
+
+class FraudDetectionTest extends TestCase
+{
+    public function test_fraud_detection_flags_suspicious_activity()
+    {
+        // Placeholder for fraud detection tests
+    }
+}
+
+class PaymentProcessingTest extends TestCase
+{
+    public function test_payment_can_be_processed()
+    {
+        // Placeholder for payment processing tests
+    }
+}
+
+class NotificationTest extends TestCase
+{
+    public function test_user_receives_notification()
+    {
+        // Placeholder for notification tests
+    }
+}

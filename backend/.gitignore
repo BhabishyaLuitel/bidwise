@@ -1,0 +1,31 @@
+# Laravel specific
+/vendor
+/node_modules
+/public/storage
+/storage/*.key
+/.env
+/.env.backup
+/.env.local
+/.env.development
+/.env.testing
+/.env.production
+/.env.example
+
+# Laravel 5 & 6 specific
+Homestead.yaml
+Homestead.json
+.env.homestead
+
+# IDE specific
+.idea
+.vscode
+*.sublime-project
+*.sublime-workspace
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Other
+npm-debug.log
+yarn-error.log

@@ -1,0 +1,10 @@
+# Exclude node_modules directory
+node_modules/
+
+# Exclude environment variables file
+.env
+
+# Other common exclusions
+.DS_Store
+npm-debug.log
+yarn-error.log

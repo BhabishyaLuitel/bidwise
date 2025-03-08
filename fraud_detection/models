@@ -1,0 +1,23 @@
+from sklearn.ensemble import IsolationForest
+import pandas as pd
+
+class FraudDetectionModel:
+    def __init__(self):
+        self.model = IsolationForest(contamination=0.1)  # Adjust contamination based on expected fraud rate
+
+    def train(self, data):
+        # Assuming 'data' is a DataFrame with relevant features for fraud detection
+        self.model.fit(data)
+
+    def predict(self, data):
+        # Assuming 'data' is a DataFrame with the same features used for training
+        predictions = self.model.predict(data)
+        return predictions  # Returns -1 for outliers (fraud) and 1 for inliers (normal) 
+
+    def save_model(self, filename):
+        import joblib
+        joblib.dump(self.model, filename)
+
+    def load_model(self, filename):
+        import joblib
+        self.model = joblib.load(filename)

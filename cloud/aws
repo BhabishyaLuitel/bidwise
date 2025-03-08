@@ -1,0 +1,23 @@
+# AWS Configuration for BidWise
+
+This file contains configuration settings and scripts for deploying the BidWise application on AWS.
+
+# AWS Configuration
+
+# AWS S3 Bucket Configuration
+# Create an S3 bucket for storing auction item images
+aws s3api create-bucket --bucket bidwise-auction-images --region us-east-1
+
+# AWS RDS Configuration
+# Create an RDS instance for MySQL database
+aws rds create-db-instance --db-instance-identifier bidwise-db --db-instance-class db.t2.micro --engine mysql --master-username admin --master-user-password password --allocated-storage 20
+
+# AWS IAM Role for Lambda
+# Create an IAM role for AWS Lambda to allow access to S3 and RDS
+aws iam create-role --role-name BidWiseLambdaRole --assume-role-policy-document file://trust-policy.json
+
+# AWS CloudFront Distribution
+# Create a CloudFront distribution for serving the frontend
+aws cloudfront create-distribution --origin-domain-name bidwise-frontend.s3.amazonaws.com
+
+# Note: Replace placeholders with actual values and ensure proper permissions are set for AWS resources.
