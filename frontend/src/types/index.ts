@@ -1,9 +1,31 @@
+export type Role = 'buyer' | 'seller' | 'admin';
+
+export type Permission = 
+  | 'create:listing'
+  | 'edit:listing'
+  | 'delete:listing'
+  | 'manage:users'
+  | 'manage:roles'
+  | 'view:admin_dashboard'
+  | 'place:bid';
+
 export type User = {
   id: string;
   username: string;
   email: string;
-  role: 'buyer' | 'seller' | 'admin';
+  role: Role;
+  permissions: Permission[];
   createdAt: Date;
+  avatar?: string;
+  bio?: string;
+  location?: string;
+  phone?: string;
+  totalBids?: number;
+  wonAuctions?: number;
+  activeListings?: number;
+  completedSales?: number;
+  rating?: number;
+  reviewCount?: number;
 };
 
 export type Item = {
@@ -17,6 +39,9 @@ export type Item = {
   category: string;
   endTime: Date;
   status: 'active' | 'ended' | 'sold';
+  totalBids: number;
+  createdAt: Date;
+  updatedAt?: Date;
 };
 
 export type Bid = {
@@ -39,8 +64,11 @@ export type Notification = {
 export type AuthContextType = {
   user: User | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, username: string) => Promise<void>;
+  signUp: (email: string, password: string, username: string, role: Role) => Promise<void>;
   signOut: () => void;
   loading: boolean;
   error: string | null;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  updateUserRole: (userId: string, role: Role) => Promise<void>;
+  hasPermission: (permission: Permission) => boolean;
 };

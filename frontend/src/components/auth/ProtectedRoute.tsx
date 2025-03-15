@@ -1,8 +1,14 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { Permission } from '../../types';
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredPermission?: Permission;
+}
+
+export function ProtectedRoute({ children, requiredPermission }: ProtectedRouteProps) {
+  const { user, loading, hasPermission } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -18,6 +24,19 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  if (requiredPermission && !hasPermission(requiredPermission)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="rounded-lg bg-red-50 p-4 text-center">
+          <h2 className="text-lg font-semibold text-red-800">Access Denied</h2>
+          <p className="mt-2 text-red-600">
+            You don't have permission to access this page.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

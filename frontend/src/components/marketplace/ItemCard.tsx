@@ -43,6 +43,10 @@ export function ItemCard({ item }: ItemCardProps) {
             {getTimeLeft(item.endTime)}
           </div>
         </div>
+
+        <div className="mt-2 text-sm text-gray-500">
+          {item.totalBids} {item.totalBids === 1 ? 'bid' : 'bids'}
+        </div>
       </div>
     </Link>
   );

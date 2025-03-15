@@ -26,3 +26,10 @@ export function getTimeLeft(endTime: Date): string {
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
 }
+
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
+}

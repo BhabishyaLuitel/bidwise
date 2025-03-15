@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { FieldErrors, useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
 import { Mail, Lock, User } from 'lucide-react';
+import { Role, ROLE_LABELS } from '../../lib/permissions';
 
 const signInSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -13,6 +14,7 @@ const signInSchema = z.object({
 
 const signUpSchema = signInSchema.extend({
   username: z.string().min(3, 'Username must be at least 3 characters'),
+  role: z.enum(['buyer', 'seller'] as const),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -32,19 +34,16 @@ export function AuthForm() {
     formState: { errors },
     reset,
   } = useForm<SignInInputs | SignUpInputs>({
-    defaultValues: {
-      email: "",
-      username: "",
-      password: "",
-      confirmPassword: ""
-    },
     resolver: zodResolver(isSignUp ? signUpSchema : signInSchema),
+    defaultValues: {
+      role: 'buyer',
+    },
   });
 
   const onSubmit = async (data: SignInInputs | SignUpInputs) => {
     try {
-      if (isSignUp && 'username' in data) {
-        await signUp(data.email, data.password, data.username);
+      if (isSignUp && 'username' in data && 'role' in data) {
+        await signUp(data.email, data.password, data.username, data.role);
       } else {
         await signIn(data.email, data.password);
       }
@@ -62,21 +61,37 @@ export function AuthForm() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {isSignUp && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Username</label>
-            <div className="relative mt-1">
-              <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <input
-                {...register('username')}
-                type="text"
-                className="block w-full rounded-md border border-gray-300 pl-10 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                placeholder="Enter your username"
-              />
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Username</label>
+              <div className="relative mt-1">
+                <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                <input
+                  {...register('username')}
+                  type="text"
+                  className="block w-full rounded-md border border-gray-300 pl-10 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Enter your username"
+                />
+              </div>
+              {errors.username && (
+                <p className="mt-1 text-sm text-red-600">{errors.username.message}</p>
+              )}
             </div>
-            {isSignUp && (errors as FieldErrors<SignUpInputs>).username && (
-              <p className="mt-1 text-sm text-red-600">{(errors as FieldErrors<SignUpInputs>).username?.message}</p>
-            )}
-          </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Account Type</label>
+              <select
+                {...register('role')}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="buyer">{ROLE_LABELS.buyer}</option>
+                <option value="seller">{ROLE_LABELS.seller}</option>
+              </select>
+              {errors.role && (
+                <p className="mt-1 text-sm text-red-600">{errors.role.message}</p>
+              )}
+            </div>
+          </>
         )}
 
         <div>
@@ -123,8 +138,8 @@ export function AuthForm() {
                 placeholder="Confirm your password"
               />
             </div>
-            {isSignUp && (errors as FieldErrors<SignUpInputs>).confirmPassword && (
-              <p className="mt-1 text-sm text-red-600">{(errors as FieldErrors<SignUpInputs>).confirmPassword?.message}</p>
+            {errors.confirmPassword && (
+              <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
             )}
           </div>
         )}

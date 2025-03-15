@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, User, Clock, DollarSign, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { formatPrice, getTimeLeft } from '../lib/utils';
+import { Item } from '../types';
 import { MOCK_ITEMS } from './MarketplacePage';
 
 interface BidHistory {

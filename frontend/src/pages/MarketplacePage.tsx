@@ -1,8 +1,12 @@
-import { useState } from 'react';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { Item } from '../types';
 import { ItemCard } from '../components/marketplace/ItemCard';
 import { Button } from '../components/ui/Button';
+import { useSearchStore } from '../stores/searchStore';
+import { useAuth } from '../contexts/AuthContext';
+import { cn } from '../lib/utils';
 
 const CATEGORIES = [
   'All Categories',
@@ -16,6 +20,21 @@ const CATEGORIES = [
   'Jewelry',
 ];
 
+const SORT_OPTIONS = [
+  { label: 'Newest First', value: 'newest' },
+  { label: 'Ending Soon', value: 'ending' },
+  { label: 'Price: Low to High', value: 'price_asc' },
+  { label: 'Price: High to Low', value: 'price_desc' },
+  { label: 'Most Bids', value: 'bids' },
+];
+
+const STATUS_OPTIONS = [
+  { label: 'All Status', value: 'all' },
+  { label: 'Active', value: 'active' },
+  { label: 'Ending Soon', value: 'ending_soon' },
+  { label: 'Ended', value: 'ended' },
+];
+
 export const MOCK_ITEMS: Item[] = [
   {
     id: '1',
@@ -26,8 +45,10 @@ export const MOCK_ITEMS: Item[] = [
     currentBid: 16500,
     sellerId: 'seller1',
     category: 'Jewelry',
-    endTime: new Date(Date.now() + 172800000), // 48 hours from now
+    endTime: new Date(Date.now() + 172800000),
     status: 'active',
+    totalBids: 12,
+    createdAt: new Date(Date.now() - 86400000),
   },
   {
     id: '2',
@@ -38,8 +59,10 @@ export const MOCK_ITEMS: Item[] = [
     currentBid: 1350,
     sellerId: 'seller2',
     category: 'Electronics',
-    endTime: new Date(Date.now() + 86400000), // 24 hours from now
+    endTime: new Date(Date.now() + 86400000),
     status: 'active',
+    totalBids: 8,
+    createdAt: new Date(Date.now() - 172800000),
   },
   {
     id: '3',
@@ -50,24 +73,129 @@ export const MOCK_ITEMS: Item[] = [
     currentBid: 6200,
     sellerId: 'seller3',
     category: 'Collectibles',
-    endTime: new Date(Date.now() + 259200000), // 72 hours from now
+    endTime: new Date(Date.now() + 259200000),
     status: 'active',
+    totalBids: 15,
+    createdAt: new Date(Date.now() - 259200000),
   },
 ];
 
 export function MarketplacePage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { query, isSearching, setQuery } = useSearchStore();
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedSort, setSelectedSort] = useState('newest');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+
+  useEffect(() => {
+    const searchQuery = searchParams.get('search');
+    const category = searchParams.get('category');
+    const status = searchParams.get('status');
+    const sort = searchParams.get('sort');
+    const minPrice = searchParams.get('minPrice');
+    const maxPrice = searchParams.get('maxPrice');
+
+    if (searchQuery) setQuery(searchQuery);
+    if (category) setSelectedCategory(category);
+    if (status) setSelectedStatus(status);
+    if (sort) setSelectedSort(sort);
+    if (minPrice && maxPrice) {
+      setPriceRange([Number(minPrice), Number(maxPrice)]);
+    }
+  }, [searchParams, setQuery]);
+
+  useEffect(() => {
+    const filters: string[] = [];
+    if (selectedCategory !== 'All Categories') filters.push(selectedCategory);
+    if (selectedStatus !== 'all') filters.push(selectedStatus);
+    if (priceRange[0] > 0 || priceRange[1] < 50000) filters.push('Price Range');
+    if (query) filters.push('Search');
+    setActiveFilters(filters);
+  }, [selectedCategory, selectedStatus, priceRange, query]);
+
+  const sortItems = (items: Item[]) => {
+    switch (selectedSort) {
+      case 'newest':
+        return [...items].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      case 'ending':
+        return [...items].sort((a, b) => a.endTime.getTime() - b.endTime.getTime());
+      case 'price_asc':
+        return [...items].sort((a, b) => a.currentBid - b.currentBid);
+      case 'price_desc':
+        return [...items].sort((a, b) => b.currentBid - a.currentBid);
+      case 'bids':
+        return [...items].sort((a, b) => b.totalBids - a.totalBids);
+      default:
+        return items;
+    }
+  };
 
   const filteredItems = MOCK_ITEMS.filter((item) => {
     const matchesCategory = selectedCategory === 'All Categories' || item.category === selectedCategory;
     const matchesPrice = item.currentBid >= priceRange[0] && item.currentBid <= priceRange[1];
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesPrice && matchesSearch;
+    const matchesSearch = !query.trim() || 
+      item.title.toLowerCase().includes(query.toLowerCase()) ||
+      item.description.toLowerCase().includes(query.toLowerCase());
+    const matchesStatus = selectedStatus === 'all' || 
+      (selectedStatus === 'ending_soon' && item.endTime.getTime() - Date.now() < 86400000) ||
+      (selectedStatus === 'active' && item.status === 'active') ||
+      (selectedStatus === 'ended' && item.status === 'ended');
+    
+    return matchesCategory && matchesPrice && matchesSearch && matchesStatus;
   });
+
+  const sortedItems = sortItems(filteredItems);
+
+  const clearFilter = (filter: string) => {
+    switch (filter) {
+      case 'Search':
+        setQuery('');
+        break;
+      case selectedCategory:
+        setSelectedCategory('All Categories');
+        break;
+      case selectedStatus:
+        setSelectedStatus('all');
+        break;
+      case 'Price Range':
+        setPriceRange([0, 50000]);
+        break;
+    }
+  };
+
+  const clearAllFilters = () => {
+    setQuery('');
+    setSelectedCategory('All Categories');
+    setSelectedStatus('all');
+    setPriceRange([0, 50000]);
+    setSelectedSort('newest');
+  };
+
+  useEffect(() => {
+    const newParams = new URLSearchParams();
+    
+    if (query) newParams.set('search', query);
+    if (selectedCategory !== 'All Categories') newParams.set('category', selectedCategory);
+    if (selectedStatus !== 'all') newParams.set('status', selectedStatus);
+    if (selectedSort !== 'newest') newParams.set('sort', selectedSort);
+    if (priceRange[0] > 0) newParams.set('minPrice', priceRange[0].toString());
+    if (priceRange[1] < 50000) newParams.set('maxPrice', priceRange[1].toString());
+    
+    setSearchParams(newParams, { replace: true });
+  }, [query, selectedCategory, selectedStatus, selectedSort, priceRange, setSearchParams]);
+
+  const handleBidClick = (itemId: string) => {
+    if (!user) {
+      navigate('/auth', { state: { from: `/marketplace/${itemId}` } });
+    } else {
+      navigate(`/marketplace/${itemId}`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -83,23 +211,61 @@ export function MarketplacePage() {
             <input
               type="search"
               placeholder="Search items..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
-          <Button
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-            className="lg:hidden"
-          >
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
-            Filters
-          </Button>
+          <div className="flex items-center gap-4">
+            <select
+              value={selectedSort}
+              onChange={(e) => setSelectedSort(e.target.value)}
+              className="rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="lg:hidden"
+            >
+              <SlidersHorizontal className="mr-2 h-4 w-4" />
+              Filters
+            </Button>
+          </div>
         </div>
 
+        {activeFilters.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-gray-500">Active Filters:</span>
+            {activeFilters.map((filter) => (
+              <button
+                key={filter}
+                onClick={() => clearFilter(filter)}
+                className="flex items-center rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700"
+              >
+                {filter}
+                <X className="ml-1 h-4 w-4" />
+              </button>
+            ))}
+            <button
+              onClick={clearAllFilters}
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              Clear All
+            </button>
+          </div>
+        )}
+
         <div className="mb-8 grid gap-6 lg:grid-cols-[240px,1fr]">
-          <div className={`space-y-6 rounded-lg bg-white p-6 shadow-sm ${showFilters ? 'block' : 'hidden lg:block'}`}>
+          <div className={cn(
+            "space-y-6 rounded-lg bg-white p-6 shadow-sm",
+            showFilters ? 'block' : 'hidden lg:block'
+          )}>
             <div>
               <h3 className="mb-4 font-semibold text-gray-900">Categories</h3>
               <div className="space-y-2">
@@ -114,6 +280,25 @@ export function MarketplacePage() {
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                     />
                     <span className="ml-2 text-sm text-gray-700">{category}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="mb-4 font-semibold text-gray-900">Status</h3>
+              <div className="space-y-2">
+                {STATUS_OPTIONS.map((option) => (
+                  <label key={option.value} className="flex items-center">
+                    <input
+                      type="radio"
+                      name="status"
+                      value={option.value}
+                      checked={selectedStatus === option.value}
+                      onChange={(e) => setSelectedStatus(e.target.value)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">{option.label}</span>
                   </label>
                 ))}
               </div>
@@ -144,10 +329,12 @@ export function MarketplacePage() {
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredItems.map((item) => (
-              <ItemCard key={item.id} item={item} />
+            {sortedItems.map((item) => (
+              <div key={item.id} onClick={() => handleBidClick(item.id)}>
+                <ItemCard item={item} />
+              </div>
             ))}
-            {filteredItems.length === 0 && (
+            {sortedItems.length === 0 && (
               <div className="col-span-full rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
                 <p className="text-gray-500">No items found matching your criteria</p>
               </div>
