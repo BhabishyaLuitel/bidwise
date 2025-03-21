@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { HomePage } from './pages/HomePage';
+import { GetStartedPage } from './pages/GetStartedPage';
 import { AuthPage } from './pages/AuthPage';
 import { MarketplacePage } from './pages/MarketplacePage';
 import { ItemDetailPage } from './pages/ItemDetailPage';
@@ -21,22 +22,12 @@ function App() {
           <main className="flex-1">
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/get-started" element={<GetStartedPage />} />
               <Route path="/auth" element={<AuthPage />} />
-              <Route
-                path="/marketplace"
-                element={
-                  <ProtectedRoute>
-                    <MarketplacePage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/marketplace" element={<MarketplacePage />} />
               <Route
                 path="/marketplace/:id"
-                element={
-                  <ProtectedRoute>
-                    <ItemDetailPage />
-                  </ProtectedRoute>
-                }
+                element={<ItemDetailPage />}
               />
               <Route
                 path="/sell"
@@ -87,4 +78,4 @@ function App() {
   );
 }
 
-export default App
+export default App;

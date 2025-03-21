@@ -3,6 +3,7 @@ import { Bell, Search, User, LogOut, Shield } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSearchStore } from '../../stores/searchStore';
+import { NotificationIcon } from '../notifications/NotificationIcon';
 
 export function Header() {
   const { user, signOut, hasPermission } = useAuth();
@@ -57,6 +58,14 @@ export function Header() {
             >
               Marketplace
             </Link>
+            {!user && (
+              <Link 
+                to="/get-started" 
+                className="text-gray-600 hover:text-gray-900"
+              >
+                Get Started
+              </Link>
+            )}
             {hasPermission('create:listing') && (
               <Link 
                 to="/sell" 
@@ -70,9 +79,7 @@ export function Header() {
           <div className="flex items-center space-x-4">
             {user ? (
               <>
-                <Button variant="ghost" size="sm">
-                  <Bell className="h-5 w-5" />
-                </Button>
+                <NotificationIcon />
                 {hasPermission('view:admin_dashboard') && (
                   <Link to="/admin">
                     <Button variant="ghost" size="sm">

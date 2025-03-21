@@ -38,7 +38,7 @@ export function Footer() {
           {/* Company Info */}
           <div className="space-y-4">
             <Link to="/" className="text-2xl font-bold text-white">
-              AuctionHub
+              BidWise
             </Link>
             <p className="text-sm text-gray-400">
               Your trusted platform for online auctions. Discover unique items and bid with confidence.
@@ -97,8 +97,8 @@ export function Footer() {
             <div className="space-y-4 text-sm">
               <div className="flex items-center">
                 <Mail className="mr-2 h-4 w-4" />
-                <a href="mailto:support@auctionhub.com" className="hover:text-white">
-                  support@auctionhub.com
+                <a href="mailto:support@bidwise.com" className="hover:text-white">
+                  support@bidwise.com
                 </a>
               </div>
               <div className="flex items-center">
@@ -133,7 +133,7 @@ export function Footer() {
               ))}
             </div>
             <p className="text-gray-400">
-              © {new Date().getFullYear()} AuctionHub. All rights reserved.
+              © {new Date().getFullYear()} BidWise. All rights reserved.
             </p>
           </div>
         </div>

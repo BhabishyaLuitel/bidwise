@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
 import { Mail, Lock, User } from 'lucide-react';
-import { Role, ROLE_LABELS } from '../../lib/permissions';
+import { ROLE_LABELS } from '../../lib/permissions';
 
 const signInSchema = z.object({
   email: z.string().email('Invalid email address'),

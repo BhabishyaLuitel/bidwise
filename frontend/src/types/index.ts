@@ -52,11 +52,15 @@ export type Bid = {
   timestamp: Date;
 };
 
+export type NotificationType = 'bid' | 'outbid' | 'won' | 'ended' | 'payment' | 'system';
+
 export type Notification = {
   id: string;
   userId: string;
-  type: 'bid' | 'outbid' | 'won' | 'ended' | 'payment';
+  type: NotificationType;
+  title: string;
   message: string;
+  itemId?: string;
   read: boolean;
   timestamp: Date;
 };
