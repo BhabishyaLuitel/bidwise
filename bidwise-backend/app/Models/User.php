@@ -19,10 +19,10 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
+        'username',
         'email',
         'password',
-        "role"
+        'role'
     ];
 
     /**
@@ -45,6 +45,22 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'role' => 'string',
+        ];
+    }
+
+    /**
+     * Validation rules for user registration
+     *
+     * @return array<string, mixed>
+     */
+    public static function validationRules(): array
+    {
+        return [
+            'username' => 'required|string|min:3',
+            'email' => 'required|string|email|unique:users,email',
+            'password' => 'required|string|min:8',
+            'role' => 'required|string|in:buyer,seller',
         ];
     }
 }

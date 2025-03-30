@@ -12,21 +12,46 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
+        $request->validate([
+            'username' => 'required|string|min:3',
+            'email' => 'required|string|email|unique:users,email',
+            'password' => 'required|string|min:8',
+            'role' => 'required|string|in:buyer,seller',
+        ]);
+
         try {
             $user = User::create([
-                'name' => $request->name,
+                'username' => $request->username,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
                 'email_verified_at' => now(),
             ]);
 
+            $token = $user->createToken('auth_token', ['*'])->plainTextToken;
+
             return response()->json([
+                'status' => 'success',
                 'message' => 'User registered successfully',
-                'user' => $user
+                'data' => [
+                    'token' => $token,
+                    'token_type' => 'Bearer',
+                    'user' => [
+                        'id' => $user->id,
+                        'username' => $user->username,
+                        'email' => $user->email,
+                        'role' => $user->role,
+                        'permissions' => [],
+                        'created_at' => $user->created_at,
+                    ],
+                ],
             ], 201);
         } catch (\Exception $e) {
-            return response()->json(['error' => $request->role], 500);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Registration failed',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -38,22 +63,30 @@ class AuthController extends Controller
         ]);
 
         if (!Auth::attempt($request->only('email', 'password'))) {
-            return response()->json(['message' => 'Invalid login credentials'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid login credentials'
+            ], 401);
         }
 
         $user = Auth::user();
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $token = $user->createToken('auth_token', ['*'])->plainTextToken;
 
         return response()->json([
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'createdAt' => $user->created_at,
+            'status' => 'success',
+            'message' => 'Login successful',
+            'data' => [
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'user' => [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'permissions' => [],
+                    'created_at' => $user->created_at,
+                ],
             ],
-        ], 201);
+        ], 200);
     }
 }
