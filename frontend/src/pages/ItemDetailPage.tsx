@@ -1,74 +1,106 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, User, Clock, DollarSign, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { formatPrice, getTimeLeft } from '../lib/utils';
 import { Item } from '../types';
-import { MOCK_ITEMS } from './MarketplacePage';
-
-interface BidHistory {
-  id: string;
-  userId: string;
-  username: string;
-  amount: number;
-  timestamp: Date;
-}
-
-const MOCK_BIDS: BidHistory[] = [
-  {
-    id: 'bid1',
-    userId: 'user1',
-    username: 'JohnDoe',
-    amount: 16500,
-    timestamp: new Date(Date.now() - 3600000),
-  },
-  {
-    id: 'bid2',
-    userId: 'user2',
-    username: 'JaneSmith',
-    amount: 16000,
-    timestamp: new Date(Date.now() - 7200000),
-  },
-  {
-    id: 'bid3',
-    userId: 'user3',
-    username: 'BobWilson',
-    amount: 15500,
-    timestamp: new Date(Date.now() - 10800000),
-  },
-];
+import { itemsApi } from '../lib/api/items';
+import { bidsApi, BidResponse } from '../lib/api/bids';
+import { useUserStore } from '../stores/userStore';
+import { subscribeToItemBids, unsubscribeFromItemBids } from '../lib/socket';
 
 export function ItemDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useUserStore();
   const [selectedImage, setSelectedImage] = useState(0);
   const [bidAmount, setBidAmount] = useState('');
   const [showBidError, setShowBidError] = useState(false);
+  const [item, setItem] = useState<Item | null>(null);
+  const [bids, setBids] = useState<BidResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const item = MOCK_ITEMS.find((item) => item.id === id);
+  useEffect(() => {
+    const fetchItemAndBids = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  if (!item) {
+        const [itemResponse, bidsResponse] = await Promise.all([
+          itemsApi.getById(id!),
+          bidsApi.getByItem(id!),
+        ]);
+
+        setItem(itemResponse.data);
+        setBids(bidsResponse.data.data);
+      } catch (err) {
+        setError('Failed to load item details. Please try again later.');
+        console.error('Error fetching item details:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchItemAndBids();
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    // Subscribe to real-time bid updates
+    subscribeToItemBids(id, (newBid) => {
+      setBids(prev => [newBid, ...prev]);
+      setItem(prev => prev ? { ...prev, currentBid: newBid.amount, totalBids: prev.totalBids + 1 } : null);
+    });
+
+    // Cleanup subscription when component unmounts
+    return () => {
+      unsubscribeFromItemBids(id);
+    };
+  }, [id]);
+
+  const handleBid = async () => {
+    const amount = Number(bidAmount);
+    if (amount <= item!.currentBid) {
+      setShowBidError(true);
+      return;
+    }
+
+    try {
+      const response = await bidsApi.create(id!, amount);
+      const newBid = response.data.bid;
+      setBids(prev => [newBid, ...prev]);
+      setItem(prev => prev ? { ...prev, currentBid: amount, totalBids: prev.totalBids + 1 } : null);
+      setShowBidError(false);
+      setBidAmount('');
+    } catch (err) {
+      setError('Failed to place bid. Please try again later.');
+      console.error('Error placing bid:', err);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="rounded-lg bg-red-50 p-4 text-red-800">
-          Item not found
+        <div className="flex items-center justify-center py-12">
+          <div className="text-gray-500">Loading item details...</div>
         </div>
       </div>
     );
   }
 
-  const handleBid = () => {
-    const amount = Number(bidAmount);
-    if (amount <= item.currentBid) {
-      setShowBidError(true);
-      return;
-    }
-    // TODO: Implement bid submission
-    setShowBidError(false);
-    setBidAmount('');
-  };
+  if (error || !item) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="rounded-lg bg-red-50 p-4 text-red-800">
+          {error || 'Item not found'}
+        </div>
+      </div>
+    );
+  }
 
-  const minimumBid = item.currentBid + 100; // Minimum increment of $100
+  const minimumBid = item.currentBid + 1; // Minimum increment of $1
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -134,7 +166,7 @@ export function ItemDetailPage() {
                   <p className="text-sm text-gray-500">Time Left</p>
                   <div className="flex items-center text-gray-900">
                     <Clock className="mr-1 h-4 w-4" />
-                    {getTimeLeft(item.endTime)}
+                    {getTimeLeft(new Date(item.endTime))}
                   </div>
                 </div>
               </div>
@@ -152,6 +184,7 @@ export function ItemDetailPage() {
                       onChange={(e) => setBidAmount(e.target.value)}
                       className="block w-full rounded-md border border-gray-300 pl-10 pr-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       placeholder={`Enter amount (USD)`}
+                      disabled={!isAuthenticated || item.status !== 'active'}
                     />
                   </div>
                   {showBidError && (
@@ -161,8 +194,12 @@ export function ItemDetailPage() {
                     </p>
                   )}
                 </div>
-                <Button onClick={handleBid} className="w-full">
-                  Place Bid
+                <Button 
+                  onClick={handleBid} 
+                  className="w-full"
+                  disabled={!isAuthenticated || item.status !== 'active'}
+                >
+                  {!isAuthenticated ? 'Sign in to bid' : item.status !== 'active' ? 'Auction ended' : 'Place Bid'}
                 </Button>
               </div>
             </div>
@@ -170,22 +207,25 @@ export function ItemDetailPage() {
             <div className="rounded-lg bg-white p-6 shadow-sm">
               <h2 className="mb-4 text-lg font-semibold text-gray-900">Bid History</h2>
               <div className="space-y-4">
-                {MOCK_BIDS.map((bid) => (
+                {bids.map((bid) => (
                   <div key={bid.id} className="flex items-center justify-between border-b pb-4 last:border-0">
                     <div className="flex items-center">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
                         <User className="h-4 w-4 text-gray-600" />
                       </div>
                       <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900">{bid.username}</p>
+                        <p className="text-sm font-medium text-gray-900">{bid.user.username}</p>
                         <p className="text-sm text-gray-500">
-                          {bid.timestamp.toLocaleDateString()} {bid.timestamp.toLocaleTimeString()}
+                          {new Date(bid.timestamp).toLocaleDateString()} {new Date(bid.timestamp).toLocaleTimeString()}
                         </p>
                       </div>
                     </div>
                     <p className="font-medium text-gray-900">{formatPrice(bid.amount)}</p>
                   </div>
                 ))}
+                {bids.length === 0 && (
+                  <p className="text-center text-gray-500">No bids yet</p>
+                )}
               </div>
             </div>
           </div>

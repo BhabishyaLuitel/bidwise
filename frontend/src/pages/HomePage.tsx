@@ -1,30 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Gavel, Clock, Shield, TrendingUp, ArrowRight, Package, Users } from 'lucide-react';
+import { Gavel, Clock, Shield, TrendingUp, ArrowRight, Package, Users, LayoutDashboard } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-
-const FEATURED_ITEMS = [
-  {
-    id: '1',
-    title: 'Vintage Rolex Submariner',
-    image: 'https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e?auto=format&fit=crop&w=800&q=80',
-    currentBid: 16500,
-    timeLeft: '2d 4h',
-  },
-  {
-    id: '2',
-    title: 'Limited Edition Art Print',
-    image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=800&q=80',
-    currentBid: 890,
-    timeLeft: '16h',
-  },
-  {
-    id: '3',
-    title: 'Rare Vinyl Collection',
-    image: 'https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=800&q=80',
-    currentBid: 450,
-    timeLeft: '1d 8h',
-  },
-];
+import { useEffect, useState } from 'react';
+import { itemsApi } from '../lib/api/items';
+import { useUserStore } from '../stores/userStore';
 
 const FEATURES = [
   {
@@ -63,6 +42,31 @@ const CATEGORIES = [
 ];
 
 export function HomePage() {
+  const [featuredItems, setFeaturedItems] = useState<Array<{
+    id: string;
+    title: string;
+    image: string;
+    currentBid: number;
+    timeLeft: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useUserStore();
+
+  useEffect(() => {
+    const fetchFeaturedItems = async () => {
+      try {
+        const response = await itemsApi.featured();
+        setFeaturedItems(response.data.data);
+      } catch (error) {
+        console.error('Error fetching featured items:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFeaturedItems();
+  }, []);
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -83,11 +87,20 @@ export function HomePage() {
                   Explore Auctions
                 </Button>
               </Link>
-              <Link to="/auth">
-                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
-                  Get Started
-                </Button>
-              </Link>
+              {user?.role === 'seller' ? (
+                <Link to="/sell">
+                  <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Seller Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/auth">
+                  <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
+                    Get Started
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -104,36 +117,49 @@ export function HomePage() {
             </Link>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURED_ITEMS.map((item) => (
-              <Link
-                key={item.id}
-                to={`/marketplace/${item.id}`}
-                className="group overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div className="aspect-video overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={item.title}
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900">{item.title}</h3>
-                  <div className="mt-2 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-500">Current Bid</p>
-                      <p className="text-lg font-bold text-blue-600">
-                        ${item.currentBid.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Clock className="mr-1 h-4 w-4" />
-                      {item.timeLeft}
-                    </div>
+            {loading ? (
+              // Loading skeleton
+              Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="animate-pulse">
+                  <div className="aspect-video rounded-lg bg-gray-200"></div>
+                  <div className="mt-4 space-y-3">
+                    <div className="h-4 w-3/4 rounded bg-gray-200"></div>
+                    <div className="h-4 w-1/2 rounded bg-gray-200"></div>
                   </div>
                 </div>
-              </Link>
-            ))}
+              ))
+            ) : (
+              featuredItems.map((item) => (
+                <Link
+                  key={item.id}
+                  to={`/marketplace/${item.id}`}
+                  className="group overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="aspect-video overflow-hidden">
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-900">{item.title}</h3>
+                    <div className="mt-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-500">Current Bid</p>
+                        <p className="text-lg font-bold text-blue-600">
+                          ${item.currentBid.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Clock className="mr-1 h-4 w-4" />
+                        {item.timeLeft}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
           </div>
         </div>
       </section>

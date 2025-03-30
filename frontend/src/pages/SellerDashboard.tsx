@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Package, DollarSign, Timer, Trash2, Edit, Eye, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { formatPrice, getTimeLeft } from '../lib/utils';
 import { Link } from 'react-router-dom';
 import { useListingStore } from '../stores/listingStore';
-import { useAuth } from '../contexts/AuthContext';
+import { useUserStore } from '../stores/userStore';
+import { itemsApi } from '../lib/api/items';
+import type { Item } from '../lib/api/items';
 import toast from 'react-hot-toast';
 
 interface DashboardStats {
@@ -15,37 +17,54 @@ interface DashboardStats {
 }
 
 export function SellerDashboard() {
-  const { user } = useAuth();
-  const { getSellerItems, deleteItem } = useListingStore();
+  const { user } = useUserStore();
+  const { deleteItem } = useListingStore();
   const [selectedTab, setSelectedTab] = useState<'active' | 'ended'>('active');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [deletingItem, setDeletingItem] = useState<string | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const sellerItems = user ? getSellerItems(user.id) : [];
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        setIsLoading(true);
+        const response = await itemsApi.getSellerItems();
+        setItems(response.data);
+      } catch (error) {
+        console.error('Failed to fetch seller items:', error);
+        toast.error('Failed to load your listings');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchItems();
+    }
+  }, [user]);
 
   const stats: DashboardStats = {
-    activeListings: sellerItems.filter(item => item.status === 'active').length,
-    totalBids: sellerItems.reduce((acc, item) => acc + item.totalBids, 0),
-    totalEarnings: sellerItems
+    activeListings: items.filter(item => item.status === 'active').length,
+    totalBids: items.reduce((acc, item) => acc + item.totalBids, 0),
+    totalEarnings: items
       .filter(item => item.status === 'sold')
       .reduce((acc, item) => acc + item.currentBid, 0),
-    endingSoon: sellerItems.filter(item => 
+    endingSoon: items.filter(item => 
       item.status === 'active' && 
-      (item.endTime.getTime() - Date.now()) < 24 * 60 * 60 * 1000
+      (new Date(item.endTime).getTime() - Date.now()) < 24 * 60 * 60 * 1000
     ).length,
   };
 
-  const filteredItems = sellerItems.filter(item => 
+  const filteredItems = items.filter(item => 
     selectedTab === 'active' ? item.status === 'active' : item.status === 'ended'
   );
 
   const handleDelete = async (itemId: string) => {
     try {
       setDeletingItem(itemId);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      deleteItem(itemId);
+      await itemsApi.delete(itemId);
+      setItems(prev => prev.filter(item => item.id !== itemId));
       setShowDeleteConfirm(null);
       toast.success('Listing deleted successfully');
     } catch (error) {
@@ -55,6 +74,16 @@ export function SellerDashboard() {
       setDeletingItem(null);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-4">
+          <div className="text-center">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -195,7 +224,7 @@ export function SellerDashboard() {
                   </td>
                   <td className="whitespace-nowrap px-6 py-4">
                     <span className="text-sm text-gray-900">
-                      {getTimeLeft(item.endTime)}
+                      {getTimeLeft(new Date(item.endTime))}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">

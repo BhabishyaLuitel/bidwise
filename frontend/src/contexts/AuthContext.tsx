@@ -1,47 +1,33 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, ReactNode } from 'react';
 import { User, AuthContextType, Role, Permission } from '../types';
-import { getRolePermissions } from '../lib/permissions';
+import { authApi } from '../lib/api/endpoints';
+import { useUserStore } from '../stores/userStore';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>({
-    id: '1',
-    username: 'johndoe',
-    email: 'john@example.com',
-    role: 'buyer',
-    permissions: getRolePermissions('buyer'),
-    createdAt: new Date('2024-01-01'),
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=300&q=80',
-    bio: 'Passionate collector and tech enthusiast',
-    location: 'New York, NY',
-    phone: '+1 (555) 123-4567',
-    totalBids: 45,
-    wonAuctions: 12,
-    activeListings: 3,
-    completedSales: 8,
-    rating: 4.8,
-    reviewCount: 23,
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    user,
+    loading,
+    error,
+    signIn: storeSignIn,
+    signUp: storeSignUp,
+    signOut: storeSignOut,
+    hasPermission,
+    setLoading,
+    setError,
+  } = useUserStore();
 
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
       setError(null);
-      // TODO: Implement actual authentication
-      const mockUser: User = {
-        id: '1',
-        username: 'johndoe',
-        email,
-        role: 'buyer',
-        permissions: getRolePermissions('buyer'),
-        createdAt: new Date(),
-      };
-      setUser(mockUser);
+      const response = await authApi.login(email, password);
+      const { data } = response.data;
+      const { token, user: userData } = data;
+      storeSignIn(userData, token);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'Invalid login credentials');
     } finally {
       setLoading(false);
     }
@@ -51,26 +37,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      // TODO: Implement actual registration
-      const mockUser: User = {
-        id: '1',
-        username,
-        email,
-        role,
-        permissions: getRolePermissions(role),
-        createdAt: new Date(),
-      };
-      setUser(mockUser);
+      const response = await authApi.register({ email, password, username, role });
+      const { data } = response.data;
+      const { token, user: userData } = data;
+      storeSignUp(userData, token);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
   const signOut = () => {
-    setUser(null);
-    setError(null);
+    storeSignOut();
   };
 
   const updateProfile = async (data: Partial<User>) => {
@@ -78,7 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
       // TODO: Implement actual profile update
-      setUser(prev => prev ? { ...prev, ...data } : null);
+      // This will be implemented when we add the profile update API endpoint
+      setError('Profile update not implemented yet');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -91,26 +71,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
       // TODO: Implement actual role update
-      setUser(prev => {
-        if (prev && prev.id === userId) {
-          return {
-            ...prev,
-            role,
-            permissions: getRolePermissions(role)
-          };
-        }
-        return prev;
-      });
+      // This will be implemented when we add the role update API endpoint
+      setError('Role update not implemented yet');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
-  };
-
-  const hasPermission = (permission: Permission): boolean => {
-    if (!user) return false;
-    return user.permissions.includes(permission);
   };
 
   return (

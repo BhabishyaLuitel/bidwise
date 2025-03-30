@@ -46,19 +46,6 @@ export function AdminDashboard() {
     }
   };
 
-  if (!hasPermission('manage:users')) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="rounded-lg bg-red-50 p-4 text-center">
-          <h2 className="text-lg font-semibold text-red-800">Access Denied</h2>
-          <p className="mt-2 text-red-600">
-            You don't have permission to access the admin dashboard.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4">

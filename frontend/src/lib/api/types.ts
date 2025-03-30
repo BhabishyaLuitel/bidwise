@@ -16,23 +16,27 @@ export interface PaginatedResponse<T> {
 // Auth Types
 export interface LoginResponse {
   token: string;
+  token_type: string;
   user: {
     id: string;
     email: string;
     username: string;
     role: string;
     permissions: string[];
+    created_at: string;
   };
 }
 
 export interface RegisterResponse {
   token: string;
+  token_type: string;
   user: {
     id: string;
     email: string;
     username: string;
     role: string;
     permissions: string[];
+    created_at: string;
   };
 }
 

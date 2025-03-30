@@ -13,14 +13,14 @@ import type {
 // Auth Endpoints
 export const authApi = {
   login: (email: string, password: string) =>
-    api.post<ApiResponse<LoginResponse>>('/auth/login', { email, password }),
+    api.post<ApiResponse<LoginResponse>>('/login', { email, password }),
 
   register: (data: { email: string; password: string; username: string; role: string }) =>
-    api.post<ApiResponse<RegisterResponse>>('/auth/register', data),
+    api.post<ApiResponse<RegisterResponse>>('/register', data),
 
-  logout: () => api.post('/auth/logout'),
+  logout: () => api.post('/logout'),
 
-  refreshToken: () => api.post<ApiResponse<{ token: string }>>('/auth/refresh'),
+  refreshToken: () => api.post<ApiResponse<{ token: string }>>('/refresh'),
 };
 
 // Items/Listings Endpoints

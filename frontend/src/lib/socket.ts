@@ -1,49 +1,50 @@
-import { io } from 'socket.io-client';
+import Echo from 'laravel-echo';
+import Pusher from 'pusher-js';
 import { toast } from 'react-hot-toast';
 
-const SOCKET_URL = 'http://localhost:3001';
+declare global {
+  interface Window {
+    Pusher: typeof Pusher;
+    Echo: Echo<any>;
+  }
+}
 
-export const socket = io(SOCKET_URL, {
-  autoConnect: false,
+window.Pusher = Pusher;
+
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+window.Echo = new Echo({
+  broadcaster: 'reverb',
+  key: import.meta.env.VITE_REVERB_APP_KEY,
+  host: import.meta.env.VITE_REVERB_HOST || '127.0.0.1',
+  port: import.meta.env.VITE_REVERB_PORT ? parseInt(import.meta.env.VITE_REVERB_PORT) : 6001,
+  scheme: import.meta.env.VITE_REVERB_SCHEME || 'http',
+  forceTLS: false,
+  encrypted: false,
+  disableStats: true,
+  authEndpoint: `${import.meta.env.VITE_API_URL}/broadcasting/auth`,
+  auth: {
+    headers: {
+      'X-CSRF-TOKEN': csrfToken,
+      'Accept': 'application/json',
+    }
+  }
 });
 
-socket.on('connect', () => {
-  console.log('Connected to WebSocket server');
-});
-
-socket.on('disconnect', () => {
-  console.log('Disconnected from WebSocket server');
-});
-
-socket.on('bid_placed', ({ itemId, amount, bidder }) => {
-  toast.success(`New bid: ${amount} by ${bidder}`);
-});
-
-socket.on('outbid', ({ itemId, amount }) => {
-  toast.error(`You've been outbid! Current bid: ${amount}`);
-});
-
-socket.on('auction_ended', ({ itemId, winner }) => {
-  toast.success(`Auction ended! Winner: ${winner}`);
-});
-
-export const connectSocket = (userId: string) => {
-  socket.auth = { userId };
-  socket.connect();
+export const subscribeToItemBids = (itemId: string, callback: (bid: any) => void) => {
+  window.Echo.private(`item.${itemId}`)
+    .listen('.bid.placed', (event: any) => {
+      callback(event.bid);
+      toast.success(`New bid: ${event.bid.amount} by ${event.bid.user.username}`);
+    })
+    .listen('.bid.outbid', (event: any) => {
+      toast.error(`You've been outbid! Current bid: ${event.amount}`);
+    })
+    .listen('.auction.ended', (event: any) => {
+      toast.success(`Auction ended! Winner: ${event.winner}`);
+    });
 };
 
-export const disconnectSocket = () => {
-  socket.disconnect();
-};
-
-export const joinAuctionRoom = (itemId: string) => {
-  socket.emit('join_auction', { itemId });
-};
-
-export const leaveAuctionRoom = (itemId: string) => {
-  socket.emit('leave_auction', { itemId });
-};
-
-export const placeBid = (itemId: string, amount: number) => {
-  socket.emit('place_bid', { itemId, amount });
+export const unsubscribeFromItemBids = (itemId: string) => {
+  window.Echo.leave(`item.${itemId}`);
 };

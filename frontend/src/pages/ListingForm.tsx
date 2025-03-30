@@ -6,7 +6,8 @@ import { z } from 'zod';
 import { ArrowLeft, Upload, X, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { useListingStore } from '../stores/listingStore';
-import { useAuth } from '../contexts/AuthContext';
+import { useUserStore } from '../stores/userStore';
+import { itemsApi } from '../lib/api/items';
 import toast from 'react-hot-toast';
 
 const listingSchema = z.object({
@@ -41,8 +42,8 @@ const DURATIONS = [
 export function ListingForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { getItem, updateItem } = useListingStore();
+  const { user } = useUserStore();
+  const { getItem, updateItem, addItem } = useListingStore();
   const isEditing = Boolean(id);
   
   const [images, setImages] = useState<string[]>([]);
@@ -120,25 +121,80 @@ export function ListingForm() {
     try {
       setIsSubmitting(true);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Convert base64 images to files
+      const imageFiles = await Promise.all(
+        images.map(async (base64String) => {
+          const response = await fetch(base64String);
+          const blob = await response.blob();
+          return new File([blob], `image-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        })
+      );
+
+      // Calculate end time based on duration
+      const endTime = new Date();
+      endTime.setDate(endTime.getDate() + data.duration);
+      
+      // Format the date in MySQL datetime format (YYYY-MM-DD HH:mm:ss)
+      const formattedEndTime = endTime.toISOString().slice(0, 19).replace('T', ' ');
 
       if (isEditing && id) {
+        // Update existing item
+        const formData = new FormData();
+        formData.append('title', data.title);
+        formData.append('description', data.description);
+        formData.append('category', data.category);
+        formData.append('starting_price', data.startingPrice.toString());
+        formData.append('end_time', formattedEndTime);
+        
+        // Append each image file
+        imageFiles.forEach((file, index) => {
+          formData.append(`images[${index}]`, file);
+        });
+
+        const response = await itemsApi.update(id, formData);
+
+        // Update local state
         updateItem(id, {
-          ...data,
-          images,
+          ...response.data,
           updatedAt: new Date(),
         });
+        
         toast.success('Listing updated successfully');
       } else {
-        // TODO: Implement create functionality
+        // Create new item
+        const formData = new FormData();
+        formData.append('title', data.title);
+        formData.append('description', data.description);
+        formData.append('category', data.category);
+        formData.append('starting_price', data.startingPrice.toString());
+        formData.append('end_time', formattedEndTime);
+        
+        // Append each image file
+        imageFiles.forEach((file, index) => {
+          formData.append(`images[${index}]`, file);
+        });
+
+        const response = await itemsApi.create(formData);
+
+        // Add to local state
+        const newItem = {
+          ...response.data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        addItem(newItem);
+        
         toast.success('Listing created successfully');
       }
       
       navigate('/sell');
     } catch (error) {
-      toast.error(isEditing ? 'Failed to update listing' : 'Failed to create listing');
       console.error('Failed to save listing:', error);
+      toast.error(
+        isEditing 
+          ? 'Failed to update listing. Please try again.' 
+          : 'Failed to create listing. Please try again.'
+      );
     } finally {
       setIsSubmitting(false);
     }

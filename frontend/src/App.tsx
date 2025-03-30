@@ -32,7 +32,7 @@ function App() {
               <Route
                 path="/sell"
                 element={
-                  <ProtectedRoute requiredPermission="create:listing">
+                  <ProtectedRoute>
                     <SellerDashboard />
                   </ProtectedRoute>
                 }
@@ -40,7 +40,7 @@ function App() {
               <Route
                 path="/sell/new"
                 element={
-                  <ProtectedRoute requiredPermission="create:listing">
+                  <ProtectedRoute>
                     <ListingForm />
                   </ProtectedRoute>
                 }
@@ -48,7 +48,7 @@ function App() {
               <Route
                 path="/sell/edit/:id"
                 element={
-                  <ProtectedRoute requiredPermission="edit:listing">
+                  <ProtectedRoute>
                     <ListingForm />
                   </ProtectedRoute>
                 }
@@ -64,7 +64,7 @@ function App() {
               <Route
                 path="/admin"
                 element={
-                  <ProtectedRoute requiredPermission="view:admin_dashboard">
+                  <ProtectedRoute>
                     <AdminDashboard />
                   </ProtectedRoute>
                 }

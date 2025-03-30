@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { useSearchStore } from '../stores/searchStore';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import { itemsApi, FilterParams } from '../lib/api/items';
 
 const CATEGORIES = [
   'All Categories',
@@ -35,51 +36,6 @@ const STATUS_OPTIONS = [
   { label: 'Ended', value: 'ended' },
 ];
 
-export const MOCK_ITEMS: Item[] = [
-  {
-    id: '1',
-    title: 'Vintage Rolex Submariner',
-    description: 'Original 1960s Rolex Submariner in excellent condition',
-    images: ['https://images.unsplash.com/photo-1587836374828-4dbafa94cf0e?auto=format&fit=crop&w=800&q=80'],
-    startingPrice: 15000,
-    currentBid: 16500,
-    sellerId: 'seller1',
-    category: 'Jewelry',
-    endTime: new Date(Date.now() + 172800000),
-    status: 'active',
-    totalBids: 12,
-    createdAt: new Date(Date.now() - 86400000),
-  },
-  {
-    id: '2',
-    title: 'Apple MacBook Pro M2',
-    description: 'Latest model MacBook Pro with M2 chip, 16GB RAM, 512GB SSD',
-    images: ['https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80'],
-    startingPrice: 1200,
-    currentBid: 1350,
-    sellerId: 'seller2',
-    category: 'Electronics',
-    endTime: new Date(Date.now() + 86400000),
-    status: 'active',
-    totalBids: 8,
-    createdAt: new Date(Date.now() - 172800000),
-  },
-  {
-    id: '3',
-    title: 'Rare Pokemon Card Collection',
-    description: 'First edition holographic cards including Charizard',
-    images: ['https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?auto=format&fit=crop&w=800&q=80'],
-    startingPrice: 5000,
-    currentBid: 6200,
-    sellerId: 'seller3',
-    category: 'Collectibles',
-    endTime: new Date(Date.now() + 259200000),
-    status: 'active',
-    totalBids: 15,
-    createdAt: new Date(Date.now() - 259200000),
-  },
-];
-
 export function MarketplacePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -91,6 +47,15 @@ export function MarketplacePage() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    lastPage: 1,
+    perPage: 12,
+    total: 0,
+  });
 
   useEffect(() => {
     const searchQuery = searchParams.get('search');
@@ -99,6 +64,7 @@ export function MarketplacePage() {
     const sort = searchParams.get('sort');
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
+    const page = searchParams.get('page');
 
     if (searchQuery) setQuery(searchQuery);
     if (category) setSelectedCategory(category);
@@ -106,6 +72,9 @@ export function MarketplacePage() {
     if (sort) setSelectedSort(sort);
     if (minPrice && maxPrice) {
       setPriceRange([Number(minPrice), Number(maxPrice)]);
+    }
+    if (page) {
+      setPagination(prev => ({ ...prev, currentPage: Number(page) }));
     }
   }, [searchParams, setQuery]);
 
@@ -118,38 +87,55 @@ export function MarketplacePage() {
     setActiveFilters(filters);
   }, [selectedCategory, selectedStatus, priceRange, query]);
 
-  const sortItems = (items: Item[]) => {
-    switch (selectedSort) {
-      case 'newest':
-        return [...items].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      case 'ending':
-        return [...items].sort((a, b) => a.endTime.getTime() - b.endTime.getTime());
-      case 'price_asc':
-        return [...items].sort((a, b) => a.currentBid - b.currentBid);
-      case 'price_desc':
-        return [...items].sort((a, b) => b.currentBid - a.currentBid);
-      case 'bids':
-        return [...items].sort((a, b) => b.totalBids - a.totalBids);
-      default:
-        return items;
-    }
-  };
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const filteredItems = MOCK_ITEMS.filter((item) => {
-    const matchesCategory = selectedCategory === 'All Categories' || item.category === selectedCategory;
-    const matchesPrice = item.currentBid >= priceRange[0] && item.currentBid <= priceRange[1];
-    const matchesSearch = !query.trim() || 
-      item.title.toLowerCase().includes(query.toLowerCase()) ||
-      item.description.toLowerCase().includes(query.toLowerCase());
-    const matchesStatus = selectedStatus === 'all' || 
-      (selectedStatus === 'ending_soon' && item.endTime.getTime() - Date.now() < 86400000) ||
-      (selectedStatus === 'active' && item.status === 'active') ||
-      (selectedStatus === 'ended' && item.status === 'ended');
+        const params: FilterParams = {
+          search: query,
+          category: selectedCategory !== 'All Categories' ? selectedCategory : undefined,
+          status: selectedStatus !== 'all' ? selectedStatus : undefined,
+          sort: selectedSort !== 'newest' ? selectedSort : undefined,
+          minPrice: priceRange[0] > 0 ? priceRange[0] : undefined,
+          maxPrice: priceRange[1] < 50000 ? priceRange[1] : undefined,
+          page: pagination.currentPage,
+          perPage: pagination.perPage,
+        };
+
+        const response = await itemsApi.getAll(params);
+        setItems(response.data.data);
+        setPagination({
+          currentPage: response.data.current_page,
+          lastPage: response.data.last_page,
+          perPage: response.data.per_page,
+          total: response.data.total,
+        });
+      } catch (err) {
+        setError('Failed to fetch items. Please try again later.');
+        console.error('Error fetching items:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchItems();
+  }, [query, selectedCategory, selectedStatus, selectedSort, priceRange, pagination.currentPage]);
+
+  useEffect(() => {
+    const newParams = new URLSearchParams();
     
-    return matchesCategory && matchesPrice && matchesSearch && matchesStatus;
-  });
-
-  const sortedItems = sortItems(filteredItems);
+    if (query) newParams.set('search', query);
+    if (selectedCategory !== 'All Categories') newParams.set('category', selectedCategory);
+    if (selectedStatus !== 'all') newParams.set('status', selectedStatus);
+    if (selectedSort !== 'newest') newParams.set('sort', selectedSort);
+    if (priceRange[0] > 0) newParams.set('minPrice', priceRange[0].toString());
+    if (priceRange[1] < 50000) newParams.set('maxPrice', priceRange[1].toString());
+    if (pagination.currentPage > 1) newParams.set('page', pagination.currentPage.toString());
+    
+    setSearchParams(newParams, { replace: true });
+  }, [query, selectedCategory, selectedStatus, selectedSort, priceRange, pagination.currentPage, setSearchParams]);
 
   const clearFilter = (filter: string) => {
     switch (filter) {
@@ -174,20 +160,8 @@ export function MarketplacePage() {
     setSelectedStatus('all');
     setPriceRange([0, 50000]);
     setSelectedSort('newest');
+    setPagination(prev => ({ ...prev, currentPage: 1 }));
   };
-
-  useEffect(() => {
-    const newParams = new URLSearchParams();
-    
-    if (query) newParams.set('search', query);
-    if (selectedCategory !== 'All Categories') newParams.set('category', selectedCategory);
-    if (selectedStatus !== 'all') newParams.set('status', selectedStatus);
-    if (selectedSort !== 'newest') newParams.set('sort', selectedSort);
-    if (priceRange[0] > 0) newParams.set('minPrice', priceRange[0].toString());
-    if (priceRange[1] < 50000) newParams.set('maxPrice', priceRange[1].toString());
-    
-    setSearchParams(newParams, { replace: true });
-  }, [query, selectedCategory, selectedStatus, selectedSort, priceRange, setSearchParams]);
 
   const handleBidClick = (itemId: string) => {
     if (!user) {
@@ -196,6 +170,30 @@ export function MarketplacePage() {
       navigate(`/marketplace/${itemId}`);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-center py-12">
+            <div className="text-gray-500">Loading items...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="container mx-auto px-4">
+          <div className="rounded-lg bg-red-50 p-4 text-red-800">
+            {error}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -329,18 +327,39 @@ export function MarketplacePage() {
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {sortedItems.map((item) => (
+            {items.map((item) => (
               <div key={item.id} onClick={() => handleBidClick(item.id)}>
                 <ItemCard item={item} />
               </div>
             ))}
-            {sortedItems.length === 0 && (
+            {items.length === 0 && (
               <div className="col-span-full rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
                 <p className="text-gray-500">No items found matching your criteria</p>
               </div>
             )}
           </div>
         </div>
+
+        {pagination.lastPage > 1 && (
+          <div className="mt-8 flex justify-center">
+            <nav className="flex items-center gap-2">
+              {Array.from({ length: pagination.lastPage }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setPagination(prev => ({ ...prev, currentPage: page }))}
+                  className={cn(
+                    "rounded-lg px-4 py-2 text-sm font-medium",
+                    pagination.currentPage === page
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  )}
+                >
+                  {page}
+                </button>
+              ))}
+            </nav>
+          </div>
+        )}
       </div>
     </div>
   );
