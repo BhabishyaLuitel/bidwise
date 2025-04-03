@@ -4,6 +4,7 @@ import { Button } from '../components/ui/Button';
 import { useEffect, useState } from 'react';
 import { itemsApi } from '../lib/api/items';
 import { useUserStore } from '../stores/userStore';
+import { API_URL_STORAGE } from '../lib/api/api';
 
 const FEATURES = [
   {
@@ -137,7 +138,7 @@ export function HomePage() {
                 >
                   <div className="aspect-video overflow-hidden">
                     <img
-                      src={item.image}
+                      src={API_URL_STORAGE + item.image}
                       alt={item.title}
                       className="h-full w-full object-cover transition-transform group-hover:scale-105"
                     />

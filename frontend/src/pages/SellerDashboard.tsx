@@ -8,6 +8,7 @@ import { useUserStore } from '../stores/userStore';
 import { itemsApi } from '../lib/api/items';
 import type { Item } from '../lib/api/items';
 import toast from 'react-hot-toast';
+import { API_URL, API_URL_STORAGE } from '../lib/api/api';
 
 interface DashboardStats {
   activeListings: number;
@@ -206,7 +207,7 @@ export function SellerDashboard() {
                   <td className="whitespace-nowrap px-6 py-4">
                     <div className="flex items-center">
                       <img
-                        src={item.images[0]}
+                        src={API_URL_STORAGE + item.images[0]}
                         alt={item.title}
                         className="h-10 w-10 rounded-lg object-cover"
                       />

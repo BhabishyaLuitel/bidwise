@@ -104,7 +104,7 @@ class ItemController extends Controller
             $images = [];
             foreach ($request->file('images') as $image) {
                 $path = $image->store('items', 'public');
-                $images[] = $path;
+                $images[] = '/storage/' . $path;
             }
 
             $item = Item::create([
@@ -180,7 +180,7 @@ class ItemController extends Controller
                 $images = [];
                 foreach ($request->file('images') as $image) {
                     $path = $image->store('items', 'public');
-                    $images[] = $path;
+                    $images[] = '/storage/' . $path;
                 }
                 $data['images'] = $images;
             }
@@ -217,7 +217,9 @@ class ItemController extends Controller
 
             // Delete images from storage
             foreach ($item->images as $image) {
-                Storage::disk('public')->delete($image);
+                // Remove the /storage/ prefix to get the actual file path
+                $path = str_replace('/storage/', '', $image);
+                Storage::disk('public')->delete($path);
             }
 
             $item->delete();

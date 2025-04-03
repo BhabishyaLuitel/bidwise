@@ -2,6 +2,7 @@ import { Heart, Timer } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Item } from '../../types';
 import { formatPrice, getTimeLeft } from '../../lib/utils';
+import { API_URL_STORAGE } from '../../lib/api/api';
 
 interface ItemCardProps {
   item: Item;
@@ -12,7 +13,7 @@ export function ItemCard({ item }: ItemCardProps) {
     <Link to={`/marketplace/${item.id}`} className="group relative rounded-lg border bg-white shadow-sm transition-shadow hover:shadow-md">
       <div className="relative aspect-square overflow-hidden rounded-t-lg">
         <img
-          src={item.images[0]}
+          src={API_URL_STORAGE + item.images[0]}
           alt={item.title}
           className="h-full w-full object-cover transition-transform group-hover:scale-105"
         />
