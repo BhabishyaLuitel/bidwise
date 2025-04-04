@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, DollarSign } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { placeBid } from '../../lib/socket';
 import { formatPrice } from '../../lib/utils';
-import { useAuth } from '../../contexts/AuthContext';
+import { useUserStore } from '../../stores/userStore';
 
 interface BidFormProps {
   itemId: string;
@@ -13,7 +12,7 @@ interface BidFormProps {
 }
 
 export function BidForm({ itemId, currentBid, minimumBid }: BidFormProps) {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission } = useUserStore();
   const navigate = useNavigate();
   const [bidAmount, setBidAmount] = useState('');
   const [error, setError] = useState<string | null>(null);

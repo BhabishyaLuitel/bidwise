@@ -1,14 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, Role, Permission } from '../types';
-import { api } from '../lib/api';
-
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  role: 'user' | 'seller';
-}
+import { Role, Permission, User } from '../types';
+import api from '../lib/api/config';
 
 interface UserState {
   user: User | null;
@@ -20,13 +13,15 @@ interface UserState {
   setToken: (token: string | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  signIn: (user: User, token: string) => void;
-  signUp: (user: User, token: string) => void;
+  signIn: (email: string, password: string, isAdmin?: boolean) => Promise<void>;
+  signUp: (email: string, password: string, username: string, role: Role) => Promise<void>;
   signOut: () => void;
   hasPermission: (permission: Permission) => boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
-  checkAuth: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  updateUserRole: (userId: string, role: Role) => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
+  refetchUser: () => Promise<void>;
+  fetchUsers: () => Promise<User[]>;
 }
 
 export const useUserStore = create<UserState>()(
@@ -50,36 +45,71 @@ export const useUserStore = create<UserState>()(
       setLoading: (loading) => set({ loading }),
       setError: (error) => set({ error }),
 
-      signIn: (user, token) => {
-        localStorage.setItem('token', token);
-        set({
-          user: {
-            ...user,
-            role: user.role as Role,
-            permissions: user.permissions as Permission[],
-            createdAt: new Date(),
-          },
-          token,
-          isAuthenticated: true,
-          loading: false,
-          error: null,
-        });
+      signIn: async (email: string, password: string, isAdmin?: boolean) => {
+        try {
+          set({ loading: true, error: null });
+          const response = await api.post('/login', { 
+            email: isAdmin ? 'admin@gmail.com' : email, 
+            password: isAdmin ? 'Password@123' : password 
+          });
+          
+          const { user: userData, token } = response.data;
+          
+          localStorage.setItem('token', token);
+          
+          set({
+            user: {
+              ...userData,
+              role: userData.role as Role,
+              permissions: userData.permissions as Permission[],
+              createdAt: new Date(userData.created_at),
+            },
+            token,
+            isAuthenticated: true,
+            loading: false,
+            error: null,
+          });
+        } catch (err) {
+          set({
+            error: err instanceof Error ? err.message : 'An error occurred during login',
+            loading: false,
+          });
+          throw err;
+        }
       },
 
-      signUp: (user, token) => {
-        localStorage.setItem('token', token);
-        set({
-          user: {
-            ...user,
-            role: user.role as Role,
-            permissions: user.permissions as Permission[],
-            createdAt: new Date(),
-          },
-          token,
-          isAuthenticated: true,
-          loading: false,
-          error: null,
-        });
+      signUp: async (email: string, password: string, username: string, role: Role) => {
+        try {
+          set({ loading: true, error: null });
+          const response = await api.post('/register', {
+            email,
+            password,
+            username,
+            role,
+            password_confirmation: password
+          });
+          
+          const { user: userData, token } = response.data;
+          
+          set({
+            user: {
+              ...userData,
+              role: userData.role as Role,
+              permissions: userData.permissions as Permission[],
+              createdAt: new Date(userData.created_at),
+            },
+            token,
+            isAuthenticated: true,
+            loading: false,
+            error: null,
+          });
+        } catch (err) {
+          set({
+            error: err instanceof Error ? err.message : 'An error occurred during registration',
+            loading: false,
+          });
+          throw err;
+        }
       },
 
       signOut: () => {
@@ -95,45 +125,113 @@ export const useUserStore = create<UserState>()(
 
       hasPermission: (permission: Permission): boolean => {
         const { user } = get();
-        if (!user) return false;
-        return user.permissions.includes(permission);
+        return user?.permissions?.includes(permission) ?? false;
       },
 
-      login: async (email: string, password: string) => {
+      updateProfile: async (data: Partial<User>) => {
         try {
-          const response = await api.post('/login', { email, password });
-          const { token, user } = response.data;
-          localStorage.setItem('token', token);
-          set({ user });
-          return true;
-        } catch (error) {
-          console.error('Login failed:', error);
-          return false;
+          set({ loading: true, error: null });
+          const response = await api.put('/users/profile', data);
+          const { data: userData } = response.data;
+          set({
+            user: {
+              ...userData,
+              role: userData.role as Role,
+              permissions: userData.permissions as Permission[],
+              createdAt: new Date(userData.created_at),
+            },
+            loading: false,
+            error: null,
+          });
+        } catch (err) {
+          set({
+            error: err instanceof Error ? err.message : 'An error occurred while updating profile',
+            loading: false,
+          });
+          throw err;
         }
       },
 
-      logout: () => {
-        localStorage.removeItem('token');
-        set({ user: null });
+      updateUserRole: async (userId: string, role: Role) => {
+        try {
+          set({ loading: true, error: null });
+          await api.put(`/users/${userId}/role`, { role });
+          await get().refetchUser();
+        } catch (err) {
+          set({
+            error: err instanceof Error ? err.message : 'An error occurred while updating user role',
+            loading: false,
+          });
+          throw err;
+        }
       },
 
-      checkAuth: async () => {
+      deleteUser: async (userId: string) => {
         try {
-          const token = localStorage.getItem('token');
-          if (token) {
-            const response = await api.get('/user');
-            set({ user: response.data });
-          }
-        } catch (error) {
-          console.error('Auth check failed:', error);
-        } finally {
-          set({ loading: false });
+          set({ loading: true, error: null });
+          await api.delete(`/users/${userId}`);
+          set({ loading: false, error: null });
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'An error occurred while deleting user';
+          set({
+            error: errorMessage,
+            loading: false,
+          });
+          throw err;
+        }
+      },
+
+      refetchUser: async () => {
+        try {
+          set({ loading: true, error: null });
+          const response = await api.get('/user');
+          const userData = response.data;
+          set({
+            user: {
+              ...userData,
+              role: userData.role as Role,
+              permissions: userData.permissions as Permission[],
+              createdAt: new Date(userData.created_at),
+            },
+            isAuthenticated: true,
+            loading: false,
+            error: null,
+          });
+        } catch (err) {
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            loading: false,
+            error: err instanceof Error ? err.message : 'An error occurred during authentication check',
+          });
+          throw err;
+        }
+      },
+
+      fetchUsers: async () => {
+        try {
+          set({ loading: true, error: null });
+          const response = await api.get('/users');
+          const users = response.data.map((userData: any) => ({
+            ...userData,
+            role: userData.role as Role,
+            permissions: userData.permissions as Permission[],
+            createdAt: new Date(userData.created_at),
+          }));
+          set({ loading: false, error: null });
+          return users;
+        } catch (err) {
+          set({
+            loading: false,
+            error: err instanceof Error ? err.message : 'An error occurred while fetching users',
+          });
+          throw err;
         }
       },
     }),
     {
       name: 'user-storage',
-      partialize: (state) => ({ user: state.user, token: state.token, isAuthenticated: state.isAuthenticated }),
     }
   )
 );

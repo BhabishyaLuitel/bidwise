@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthForm } from '../components/auth/AuthForm';
-import { useAuth } from '../contexts/AuthContext';
+import { useUserStore } from '../stores/userStore';
 
 export function AuthPage() {
-  const { user } = useAuth();
+  const { user } = useUserStore();
   const navigate = useNavigate();
   const location = useLocation();
 

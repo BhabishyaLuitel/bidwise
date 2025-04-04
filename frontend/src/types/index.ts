@@ -9,7 +9,7 @@ export type Permission =
   | 'view:admin_dashboard'
   | 'place:bid';
 
-export type User = {
+export interface User {
   id: string;
   username: string;
   email: string;
@@ -20,13 +20,19 @@ export type User = {
   bio?: string;
   location?: string;
   phone?: string;
-  totalBids?: number;
-  wonAuctions?: number;
-  activeListings?: number;
-  completedSales?: number;
-  rating?: number;
-  reviewCount?: number;
-};
+  stats?: {
+    totalBids: number;
+    wonAuctions: number;
+    activeListings: number;
+    completedSales: number;
+    rating: number;
+    reviewCount: number;
+  };
+  fraudulent_bids?: Array<{
+    item_id: string;
+    count: number;
+  }>;
+}
 
 export type Item = {
   id: string;
@@ -63,16 +69,4 @@ export type Notification = {
   itemId?: string;
   read: boolean;
   timestamp: Date;
-};
-
-export type AuthContextType = {
-  user: User | null;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, username: string, role: Role) => Promise<void>;
-  signOut: () => void;
-  loading: boolean;
-  error: string | null;
-  updateProfile: (data: Partial<User>) => Promise<void>;
-  updateUserRole: (userId: string, role: Role) => Promise<void>;
-  hasPermission: (permission: Permission) => boolean;
 };

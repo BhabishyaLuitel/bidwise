@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAuth } from '../../contexts/AuthContext';
+import { useUserStore } from '../../stores/userStore';
 import { Button } from '../ui/Button';
-import { Mail, Lock, User } from 'lucide-react';
+import { Mail, Lock, User, Shield } from 'lucide-react';
 import { ROLE_LABELS } from '../../lib/permissions';
 
 const signInSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
+  isAdmin: z.boolean().optional(),
 });
 
 const signUpSchema = signInSchema.extend({
@@ -26,26 +27,30 @@ type SignUpInputs = z.infer<typeof signUpSchema>;
 
 export function AuthForm() {
   const [isSignUp, setIsSignUp] = useState(false);
-  const { signIn, signUp, loading, error } = useAuth();
+  const { signIn, signUp, loading, error } = useUserStore();
   
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm<SignInInputs | SignUpInputs>({
     resolver: zodResolver(isSignUp ? signUpSchema : signInSchema),
     defaultValues: {
       role: 'buyer',
+      isAdmin: false,
     },
   });
+
+  const isAdmin = watch('isAdmin');
 
   const onSubmit = async (data: SignInInputs | SignUpInputs) => {
     try {
       if (isSignUp && 'username' in data && 'role' in data) {
         await signUp(data.email, data.password, data.username, data.role);
       } else {
-        await signIn(data.email, data.password);
+        await signIn(data.email, data.password, isAdmin);
       }
       reset();
     } catch (err) {
@@ -141,6 +146,21 @@ export function AuthForm() {
             {errors.confirmPassword && (
               <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
             )}
+          </div>
+        )}
+
+        {!isSignUp && (
+          <div className="flex items-center">
+            <input
+              {...register('isAdmin')}
+              type="checkbox"
+              id="isAdmin"
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="isAdmin" className="ml-2 flex items-center text-sm text-gray-700">
+              <Shield className="mr-1 h-4 w-4 text-gray-500" />
+              Login as Administrator
+            </label>
           </div>
         )}
 

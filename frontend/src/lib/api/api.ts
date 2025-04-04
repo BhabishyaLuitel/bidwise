@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { handleApiError } from './errorHandler';
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -22,7 +23,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    return Promise.reject(error);
+    return Promise.reject(handleApiError(error));
   }
 );
 
@@ -32,9 +33,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Handle unauthorized access
-      // localStorage.removeItem('token');
-      // window.location.href = '/auth';
+      localStorage.removeItem('token');
+      window.location.href = '/auth';
     }
-    return Promise.reject(error);
+    return Promise.reject(handleApiError(error));
   }
 ); 

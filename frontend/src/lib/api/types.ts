@@ -5,6 +5,11 @@ export interface ApiResponse<T> {
   status: number;
 }
 
+// For direct responses without the ApiResponse wrapper
+export interface DirectResponse<T> {
+  [key: string]: any;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -24,6 +29,10 @@ export interface LoginResponse {
     role: string;
     permissions: string[];
     created_at: string;
+    avatar?: string | null;
+    bio?: string | null;
+    location?: string | null;
+    phone?: string | null;
   };
 }
 
@@ -37,6 +46,10 @@ export interface RegisterResponse {
     role: string;
     permissions: string[];
     created_at: string;
+    avatar?: string | null;
+    bio?: string | null;
+    location?: string | null;
+    phone?: string | null;
   };
 }
 
@@ -88,12 +101,12 @@ export interface UserProfileResponse {
   email: string;
   role: string;
   permissions: string[];
-  avatar?: string;
-  bio?: string;
-  location?: string;
-  phone?: string;
-  createdAt: string;
-  stats: {
+  avatar?: string | null;
+  bio?: string | null;
+  location?: string | null;
+  phone?: string | null;
+  created_at: string;
+  stats?: {
     totalBids: number;
     wonAuctions: number;
     activeListings: number;

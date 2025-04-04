@@ -1,81 +1,45 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, User, Clock, DollarSign, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { formatPrice, getTimeLeft } from '../lib/utils';
-import { Item } from '../types';
-import { itemsApi } from '../lib/api/items';
-import { bidsApi, BidResponse } from '../lib/api/bids';
 import { useUserStore } from '../stores/userStore';
-import { subscribeToItemBids, unsubscribeFromItemBids } from '../lib/socket';
+import { useItem } from '../hooks/useItems';
+import { useItemBids, useCreateBid } from '../hooks/useBids';
+import toast from 'react-hot-toast';
 
 export function ItemDetailPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useUserStore();
   const [selectedImage, setSelectedImage] = useState(0);
   const [bidAmount, setBidAmount] = useState('');
   const [showBidError, setShowBidError] = useState(false);
-  const [item, setItem] = useState<Item | null>(null);
-  const [bids, setBids] = useState<BidResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchItemAndBids = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const { data: item, isLoading: itemLoading, error: itemError } = useItem(id || '');
+  const { data: bidsData, isLoading: bidsLoading } = useItemBids(id || '');
+  const createBid = useCreateBid();
 
-        const [itemResponse, bidsResponse] = await Promise.all([
-          itemsApi.getById(id!),
-          bidsApi.getByItem(id!),
-        ]);
-
-        setItem(itemResponse.data);
-        setBids(bidsResponse.data.data);
-      } catch (err) {
-        setError('Failed to load item details. Please try again later.');
-        console.error('Error fetching item details:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchItemAndBids();
-  }, [id]);
-
-  useEffect(() => {
-    if (!id) return;
-
-    // Subscribe to real-time bid updates
-    subscribeToItemBids(id, (newBid) => {
-      setBids(prev => [newBid, ...prev]);
-      setItem(prev => prev ? { ...prev, currentBid: newBid.amount, totalBids: prev.totalBids + 1 } : null);
-    });
-
-    // Cleanup subscription when component unmounts
-    return () => {
-      unsubscribeFromItemBids(id);
-    };
-  }, [id]);
+  const bids = bidsData?.data || [];
+  const loading = itemLoading || bidsLoading;
+  const error = itemError ? 'Failed to load item details. Please try again later.' : null;
 
   const handleBid = async () => {
+    if (!id || !item) return;
+    
     const amount = Number(bidAmount);
-    if (amount <= item!.currentBid) {
+    if (amount <= item.currentBid) {
       setShowBidError(true);
       return;
     }
 
     try {
-      const response = await bidsApi.create(id!, amount);
-      const newBid = response.data.bid;
-      setBids(prev => [newBid, ...prev]);
-      setItem(prev => prev ? { ...prev, currentBid: amount, totalBids: prev.totalBids + 1 } : null);
+      await createBid.mutateAsync({ itemId: id, amount });
       setShowBidError(false);
       setBidAmount('');
+      toast.success('Bid placed successfully!');
     } catch (err) {
-      setError('Failed to place bid. Please try again later.');
+      toast.error('Failed to place bid. Please try again later.');
       console.error('Error placing bid:', err);
     }
   };
@@ -100,7 +64,7 @@ export function ItemDetailPage() {
     );
   }
 
-  const minimumBid = item.currentBid + 1; // Minimum increment of $1
+  const minimumBid = item.currentBid + 1;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -197,9 +161,9 @@ export function ItemDetailPage() {
                 <Button 
                   onClick={handleBid} 
                   className="w-full"
-                  disabled={!isAuthenticated || item.status !== 'active'}
+                  disabled={!isAuthenticated || item.status !== 'active' || createBid.isPending}
                 >
-                  {!isAuthenticated ? 'Sign in to bid' : item.status !== 'active' ? 'Auction ended' : 'Place Bid'}
+                  {!isAuthenticated ? 'Sign in to bid' : item.status !== 'active' ? 'Auction ended' : createBid.isPending ? 'Placing bid...' : 'Place Bid'}
                 </Button>
               </div>
             </div>

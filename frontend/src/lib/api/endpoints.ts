@@ -8,15 +8,16 @@ import type {
   BidResponse,
   UserProfileResponse,
   FilterParams,
+  DirectResponse,
 } from './types';
 
 // Auth Endpoints
 export const authApi = {
   login: (email: string, password: string) =>
-    api.post<ApiResponse<LoginResponse>>('/login', { email, password }),
+    api.post<DirectResponse<LoginResponse>>('/login', { email, password }),
 
   register: (data: { email: string; password: string; username: string; role: string }) =>
-    api.post<ApiResponse<RegisterResponse>>('/register', data),
+    api.post<DirectResponse<RegisterResponse>>('/register', data),
 
   logout: () => api.post('/logout'),
 

@@ -13,6 +13,7 @@ export interface Item {
   endTime: string;
   createdAt: string;
   updatedAt: string;
+  sellerId: string;
 }
 
 export interface FilterParams {

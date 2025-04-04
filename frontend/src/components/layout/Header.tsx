@@ -1,15 +1,16 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Bell, Search, User, LogOut, Shield } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { useAuth } from '../../contexts/AuthContext';
+import { useUserStore } from '../../stores/userStore';
 import { useSearchStore } from '../../stores/searchStore';
-import { NotificationIcon } from '../notifications/NotificationIcon';
+import { useNotificationStore } from '../../stores/notificationStore';
 
 export function Header() {
-  const { user, signOut, hasPermission } = useAuth();
+  const { user, signOut, hasPermission } = useUserStore();
   const navigate = useNavigate();
   const location = useLocation();
   const { query, setQuery, setIsSearching } = useSearchStore();
+  const { unreadCount } = useNotificationStore();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,8 +80,18 @@ export function Header() {
           <div className="flex items-center space-x-4">
             {user ? (
               <>
-                <NotificationIcon />
-                {hasPermission('view:admin_dashboard') && (
+                <Link
+                  to="/notifications"
+                  className="relative p-2 text-gray-400 hover:text-gray-500"
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {unreadCount}
+                    </span>
+                  )}
+                </Link>
+                {user.role === 'admin' && (
                   <Link to="/admin">
                     <Button variant="ghost" size="sm">
                       <Shield className="h-5 w-5" />
