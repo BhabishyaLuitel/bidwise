@@ -9,6 +9,7 @@ use App\Events\BidPlaced;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\QueryException;
 
 class BidController extends Controller
 {
@@ -74,17 +75,17 @@ class BidController extends Controller
             // Load the bid with user data
             $bid->load('user');
 
-            // Broadcast the bid event
-            broadcast(new BidPlaced($bid))->toOthers();
-
             return response()->json([
                 'message' => 'Bid placed successfully',
                 'bid' => $bid,
                 'next_minimum_bid' => $bid->amount + 1,
             ]);
+        } catch (QueryException $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to place bid. Please try again.'], 500);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => $e], 500);
+            return response()->json(['message' => 'An unexpected error occurred. Please try again.'], 500);
         }
     }
 

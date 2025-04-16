@@ -3,82 +3,72 @@
 namespace App\Http\Controllers;
 
 use App\Models\Item;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Storage;
 
 class ItemController extends Controller
 {
     /**
-     * Display a listing of items with filters
+     * Display a listing of items
      */
     public function index(Request $request)
     {
-        $query = Item::query()
-            ->with([
-                'user:id,username',
-                'highestBid.user:id,username',
-            ])
-            ->when($request->search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('title', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
-                });
-            })
-            ->when($request->category && $request->category !== 'All Categories', function ($query, $category) {
-                $query->where('category', $category);
-            })
-            ->when($request->status, function ($query, $status) {
-                switch ($status) {
-                    case 'active':
-                        $query->where('status', 'active')
-                              ->where('end_time', '>', now());
-                        break;
-                    case 'ending_soon':
-                        $query->where('status', 'active')
-                              ->where('end_time', '>', now())
-                              ->where('end_time', '<=', now()->addHours(24));
-                        break;
-                    case 'ended':
-                        $query->where(function ($q) {
-                            $q->where('status', 'ended')
-                              ->orWhere('end_time', '<=', now());
-                        });
-                        break;
-                }
-            })
-            ->when($request->minPrice, function ($query, $minPrice) {
-                $query->where('current_bid', '>=', $minPrice);
-            })
-            ->when($request->maxPrice, function ($query, $maxPrice) {
-                $query->where('current_bid', '<=', $maxPrice);
-            })
-            ->when($request->sort, function ($query, $sort) {
-                switch ($sort) {
-                    case 'newest':
-                        $query->orderBy('created_at', 'desc');
-                        break;
-                    case 'ending':
-                        $query->orderBy('end_time', 'asc');
-                        break;
-                    case 'price_asc':
-                        $query->orderBy('current_bid', 'asc');
-                        break;
-                    case 'price_desc':
-                        $query->orderBy('current_bid', 'desc');
-                        break;
-                    case 'bids':
-                        $query->orderBy('total_bids', 'desc');
-                        break;
-                    default:
-                        $query->orderBy('created_at', 'desc');
-                }
-            }, function ($query) {
-                $query->orderBy('created_at', 'desc');
-            });
+        $query = Item::with('user:id,username');
 
-        $items = $query->paginate($request->perPage ?? 12);
+        // Apply filters
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->has('category')) {
+            $query->where('category', $request->category);
+        }
+
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->has('minPrice')) {
+            $query->where('current_bid', '>=', $request->minPrice);
+        }
+
+        if ($request->has('maxPrice')) {
+            $query->where('current_bid', '<=', $request->maxPrice);
+        }
+
+        // Apply sorting
+        if ($request->has('sort')) {
+            switch ($request->sort) {
+                case 'price_asc':
+                    $query->orderBy('current_bid', 'asc');
+                    break;
+                case 'price_desc':
+                    $query->orderBy('current_bid', 'desc');
+                    break;
+                case 'newest':
+                    $query->orderBy('created_at', 'desc');
+                    break;
+                case 'ending_soon':
+                    $query->orderBy('end_time', 'asc');
+                    break;
+                default:
+                    $query->orderBy('created_at', 'desc');
+            }
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
+        // Paginate results
+        $perPage = $request->input('perPage', 12);
+        $items = $query->paginate($perPage);
 
         return response()->json($items);
     }
@@ -122,11 +112,17 @@ class ItemController extends Controller
 
             DB::commit();
 
-            return response()->json($item->load('user:id,username'), 201);
+            return response()->json([
+                'message' => 'Item created successfully',
+                'item' => $item->load('user:id,username')
+            ], 201);
 
+        } catch (QueryException $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to create item. Please try again.'], 500);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => $e], 500);
+            return response()->json(['message' => 'An unexpected error occurred. Please try again.'], 500);
         }
     }
 
@@ -156,15 +152,15 @@ class ItemController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Check if item can be edited
-        if ($item->hasEnded() || $item->total_bids > 0) {
-            return response()->json(['message' => 'Cannot edit item after it has ended or received bids'], 400);
+        // Check if item has bids
+        if ($item->total_bids > 0) {
+            return response()->json(['message' => 'Cannot edit item that has bids'], 400);
         }
 
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'images' => 'nullable|array|min:1|max:4',
+            'images' => 'sometimes|array|min:1|max:4',
             'images.*' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
             'starting_price' => 'required|numeric|min:0',
             'category' => 'required|string',
@@ -174,8 +170,16 @@ class ItemController extends Controller
         try {
             DB::beginTransaction();
 
-            $data = $request->except('images');
+            $data = [
+                'title' => $request->title,
+                'description' => $request->description,
+                'starting_price' => $request->starting_price,
+                'current_bid' => $request->starting_price,
+                'category' => $request->category,
+                'end_time' => $request->end_time,
+            ];
 
+            // Handle image uploads if provided
             if ($request->hasFile('images')) {
                 $images = [];
                 foreach ($request->file('images') as $image) {
@@ -189,11 +193,17 @@ class ItemController extends Controller
 
             DB::commit();
 
-            return response()->json($item->load('user:id,username'));
+            return response()->json([
+                'message' => 'Item updated successfully',
+                'item' => $item->load('user:id,username')
+            ]);
 
+        } catch (QueryException $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to update item. Please try again.'], 500);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to update item'], 500);
+            return response()->json(['message' => 'An unexpected error occurred. Please try again.'], 500);
         }
     }
 
@@ -202,109 +212,64 @@ class ItemController extends Controller
      */
     public function destroy(Item $item)
     {
-        // Check if the authenticated user is the seller
-        if ($item->user_id !== auth()->id()) {
+        // Check if user owns the item
+        if ($item->user_id !== Auth::id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Check if item can be deleted
-        if ($item->hasEnded() || $item->total_bids > 0) {
-            return response()->json(['message' => 'Cannot delete item after it has ended or received bids'], 400);
+        // Check if item has bids
+        if ($item->total_bids > 0) {
+            return response()->json(['message' => 'Cannot delete item that has bids'], 400);
         }
 
         try {
             DB::beginTransaction();
-
-            // Delete images from storage
-            foreach ($item->images as $image) {
-                // Remove the /storage/ prefix to get the actual file path
-                $path = str_replace('/storage/', '', $image);
-                Storage::disk('public')->delete($path);
-            }
-
             $item->delete();
-
             DB::commit();
 
             return response()->json(['message' => 'Item deleted successfully']);
 
+        } catch (QueryException $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to delete item. Please try again.'], 500);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['message' => 'Failed to delete item'], 500);
+            return response()->json(['message' => 'An unexpected error occurred. Please try again.'], 500);
         }
     }
 
     /**
-     * Get items for the authenticated seller
+     * Get featured items
      */
-    public function sellerItems()
+    public function featured()
     {
-        $items = Item::where('user_id', Auth::id())
-            ->with(['bids' => function ($query) {
-                $query->orderBy('amount', 'desc');
-            }])
-            ->orderBy('created_at', 'desc')
+        $items = Item::where('status', 'active')
+            ->where('end_time', '>', now())
+            ->orderBy('total_bids', 'desc')
+            ->limit(6)
             ->get()
             ->map(function ($item) {
                 return [
                     'id' => $item->id,
                     'title' => $item->title,
-                    'description' => $item->description,
-                    'images' => $item->images,
-                    'category' => $item->category,
-                    'startingPrice' => $item->starting_price,
+                    'image' => $item->images[0] ?? null,
                     'currentBid' => $item->current_bid,
-                    'totalBids' => $item->bids->count(),
-                    'status' => $item->status,
-                    'endTime' => $item->end_time,
-                    'createdAt' => $item->created_at,
-                    'updatedAt' => $item->updated_at,
+                    'timeLeft' => $item->end_time->diffForHumans(),
                 ];
             });
 
-        return response()->json($items);
+        return response()->json(['data' => $items]);
     }
 
-    public function featured()
+    /**
+     * Get seller's items
+     */
+    public function sellerItems()
     {
-        \Log::info('Fetching featured items');
-        
-        $items = Item::with(['highestBid.user:id,username'])
-            ->where('status', 'active')
-            ->where('end_time', '>', now())
-            ->orderBy('current_bid', 'desc')
-            ->limit(3)
+        $items = Item::where('user_id', Auth::id())
+            ->orderBy('created_at', 'desc')
             ->get();
-            
-        \Log::info('Found ' . $items->count() . ' items');
-        
-        $mappedItems = $items->map(function ($item) {
-            return [
-                'id' => $item->id,
-                'title' => $item->title,
-                'image' => $item->images[0] ?? null,
-                'currentBid' => $item->current_bid,
-                'timeLeft' => $this->getTimeLeft($item->end_time),
-            ];
-        });
 
-        \Log::info('Mapped items:', $mappedItems->toArray());
-
-        return response()->json(['data' => $mappedItems]);
-    }
-
-    private function getTimeLeft($endTime)
-    {
-        $now = now();
-        $end = \Carbon\Carbon::parse($endTime);
-        $diff = $now->diff($end);
-
-        if ($diff->days > 0) {
-            return $diff->days . 'd ' . $diff->h . 'h';
-        }
-        if ($diff->h > 0) {
-            return $diff->h . 'h ' . $diff->i . 'm';
-        }
-        return $diff->i . 'm ' . $diff->s . 's';
+        return response()->json($items);
     }
 } 

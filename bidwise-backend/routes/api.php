@@ -3,6 +3,9 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\BidController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +28,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/items/featured', [ItemController::class, 'featured']);
 Route::get('/items', [ItemController::class, 'index']);
 Route::get('/items/{item}', [ItemController::class, 'show']);
+Route::get('/users/{id}', [UserController::class, 'show']);
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -52,4 +56,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/items/{item}/bids', [BidController::class, 'store']);
     Route::get('/bids/{bid}', [BidController::class, 'show']);
     Route::delete('/bids/{bid}', [BidController::class, 'destroy']);
+
+    // User profile routes
+    Route::get('/users/profile', [UserController::class, 'profile']);
+    Route::put('/users/profile', [UserController::class, 'updateProfile']);
+    Route::put('/users/{id}/role', [UserController::class, 'updateRole']);
+    Route::delete('/users/{id}', [UserController::class, 'destroy']);
+    Route::get('/users', [UserController::class, 'index']);
+
+    // Payment routes
+    Route::get('/payments/{id}', [PaymentController::class, 'show']);
+    Route::post('/payments/{id}/setup-intent', [PaymentController::class, 'createPaymentIntent']);
+
+    // Notification routes
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::put('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::put('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
 });
+
+// Stripe webhook
+Route::post('/webhook/stripe', [PaymentController::class, 'handleWebhook']);

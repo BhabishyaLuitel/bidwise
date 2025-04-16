@@ -20,8 +20,8 @@ return new class extends Migration
             $table->enum('status', ['active', 'outbid', 'won', 'lost'])->default('active');
             $table->timestamps();
 
-            // Add unique constraint to prevent duplicate bids from the same user on the same item
-            $table->unique(['item_id', 'user_id']);
+            // Add index for common queries
+            $table->index(['item_id', 'user_id']);
         });
     }
 

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class Item extends Model
 {
@@ -30,10 +31,10 @@ class Item extends Model
         'images' => 'array',
         'starting_price' => 'decimal:2',
         'current_bid' => 'decimal:2',
-        'end_time' => 'datetime:c',
+        'end_time' => 'datetime',
         'total_bids' => 'integer',
-        'created_at' => 'datetime:c',
-        'updated_at' => 'datetime:c',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     protected $hidden = [
@@ -147,7 +148,7 @@ class Item extends Model
 
     public function getEndTimeAttribute()
     {
-        return $this->attributes['end_time'];
+        return Carbon::parse($this->attributes['end_time']);
     }
 
     public function getTotalBidsAttribute()
@@ -172,6 +173,6 @@ class Item extends Model
 
     protected function serializeDate($date)
     {
-        return $date->format('c');
+        return $date instanceof Carbon ? $date->toIso8601String() : $date;
     }
 } 

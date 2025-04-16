@@ -75,7 +75,7 @@ export function SellerDashboard() {
       <div className="container mx-auto px-4">
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Seller Dashboard</h1>
-          <Link to="/seller/create">
+          <Link to="/sell/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Create Listing

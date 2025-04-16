@@ -7,6 +7,7 @@ import { useUserStore } from '../stores/userStore';
 import { useItem } from '../hooks/useItems';
 import { useItemBids, useCreateBid } from '../hooks/useBids';
 import toast from 'react-hot-toast';
+import { API_URL_STORAGE } from '../lib/api/api';
 
 export function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -82,7 +83,7 @@ export function ItemDetailPage() {
           <div className="space-y-4">
             <div className="aspect-square overflow-hidden rounded-lg bg-white">
               <img
-                src={item.images[selectedImage]}
+                src={API_URL_STORAGE + item.images[selectedImage]}
                 alt={item.title}
                 className="h-full w-full object-cover"
               />
@@ -97,7 +98,7 @@ export function ItemDetailPage() {
                   }`}
                 >
                   <img
-                    src={image}
+                    src={API_URL_STORAGE + image}
                     alt={`${item.title} - Image ${index + 1}`}
                     className="h-full w-full object-cover"
                   />
